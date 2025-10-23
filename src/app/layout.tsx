@@ -1,43 +1,34 @@
 import type React from "react"
 import type { Metadata } from "next"
-import ClientLayout from "./ClientLayout"
-import ServiceWorkerProvider from "@/components/ServiceWorkerProvider"
-
+import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
 
-export const metadata: Metadata = {
-  title: "Izakaya Tori Ichizu Restaurant - Authentic Japanese Cuisine",
-  description:
-    "Experience authentic Japanese flavors at Izakaya Tori Ichizu Restaurant. Traditional dishes with a modern twist, made with the finest ingredients.",
-  manifest: "/manifest.json",
+const _geist = Geist({ subsets: ["latin"] })
+const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
+export const metadata: Metadata = {
+  title: "Restaurant Admin",
+  description: "Restaurant management and admin portal",
+  generator: "v0.app",
+  manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
-    title: "Izakaya Tori Ichizu",
+    statusBarStyle: "black-translucent",
+    title: "Restaurant Admin",
   },
-  icons: {
-    apple: "/icon512_rounded.png",
-    icon: "/icon512_rounded.png",
+  formatDetection: {
+    telephone: false,
   },
-}
-
-export const viewport = {
-  themeColor: "#3d5a3d",
 }
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode
-}) {
+}>) {
   return (
     <html lang="en">
-      <head></head>
-      <body>
-        <ServiceWorkerProvider />
-        <ClientLayout>{children}</ClientLayout>
-      </body>
+      <body className={`font-sans antialiased`}>{children}</body>
     </html>
   )
 }

@@ -12,7 +12,9 @@ import {
   Flame,
   TrendingUp,
   ChefHat,
+  Download,
 } from "lucide-react"
+import { useState, useEffect } from "react"
 
 import {
   Sidebar,
@@ -38,14 +40,14 @@ const items = [
     title: "Dashboard",
     url: "/admin/dashboard",
     icon: Home,
-    color: "text-green-600",
-    bgColor: "hover:bg-gradient-to-r hover:from-green-50 hover:to-amber-50",
+    color: "text-orange-600",
+    bgColor: "hover:bg-gradient-to-r hover:from-orange-50 hover:to-red-50",
   },
   {
     title: "Products",
     icon: Package,
-    color: "text-green-700",
-    bgColor: "hover:bg-gradient-to-r hover:from-green-50 hover:to-amber-50",
+    color: "text-red-600",
+    bgColor: "hover:bg-gradient-to-r hover:from-orange-50 hover:to-red-50",
     items: [
       {
         title: "All Products",
@@ -57,21 +59,21 @@ const items = [
     title: "Orders",
     url: "/admin/order",
     icon: ShoppingCart,
-    color: "text-amber-600",
-    bgColor: "hover:bg-gradient-to-r hover:from-amber-50 hover:to-green-50",
+    color: "text-orange-600",
+    bgColor: "hover:bg-gradient-to-r hover:from-orange-50 hover:to-red-50",
   },
   {
     title: "Users",
     url: "/admin/users",
     icon: Users,
-    color: "text-green-600",
-    bgColor: "hover:bg-gradient-to-r hover:from-green-50 hover:to-amber-50",
+    color: "text-red-600",
+    bgColor: "hover:bg-gradient-to-r hover:from-orange-50 hover:to-red-50",
   },
   {
     title: "Content Management",
     icon: Megaphone,
-    color: "text-amber-600",
-    bgColor: "hover:bg-gradient-to-r hover:from-amber-50 hover:to-green-50",
+    color: "text-orange-600",
+    bgColor: "hover:bg-gradient-to-r hover:from-orange-50 hover:to-red-50",
     items: [
       {
         title: "Announcements",
@@ -94,8 +96,8 @@ const items = [
   {
     title: "Restaurant",
     icon: ChefHat,
-    color: "text-green-700",
-    bgColor: "hover:bg-gradient-to-r hover:from-green-50 hover:to-amber-50",
+    color: "text-red-600",
+    bgColor: "hover:bg-gradient-to-r hover:from-orange-50 hover:to-red-50",
     items: [
       {
         title: "Chefs",
@@ -107,25 +109,61 @@ const items = [
       },
     ],
   },
-  {
-    title: "Reports",
-    url: "/admin/reports",
-    icon: BarChart3,
-    color: "text-green-700",
-    bgColor: "hover:bg-gradient-to-r hover:from-green-50 hover:to-amber-50",
-  },
-  {
-    title: "Settings",
-    url: "/admin/settings",
-    icon: Settings,
-    color: "text-amber-600",
-    bgColor: "hover:bg-gradient-to-r hover:from-amber-50 hover:to-green-50",
-  },
+  // {
+  //   title: "Reports",
+  //   url: "/admin/reports",
+  //   icon: BarChart3,
+  //   color: "text-orange-600",
+  //   bgColor: "hover:bg-gradient-to-r hover:from-orange-50 hover:to-red-50",
+  // },
+  // {
+  //   title: "Settings",
+  //   url: "/admin/settings",
+  //   icon: Settings,
+  //   color: "text-red-600",
+  //   bgColor: "hover:bg-gradient-to-r hover:from-orange-50 hover:to-red-50",
+  // },
 ]
 
 export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter()
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
+  const [showInstallButton, setShowInstallButton] = useState(false)
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault()
+      setDeferredPrompt(e)
+      setShowInstallButton(true)
+    }
+
+    const handleAppInstalled = () => {
+      setShowInstallButton(false)
+      setDeferredPrompt(null)
+    }
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
+    window.addEventListener("appinstalled", handleAppInstalled)
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
+      window.removeEventListener("appinstalled", handleAppInstalled)
+    }
+  }, [])
+
+  const handleInstallApp = async () => {
+    if (!deferredPrompt) return
+
+    deferredPrompt.prompt()
+    const { outcome } = await deferredPrompt.userChoice
+
+    if (outcome === "accepted") {
+      setShowInstallButton(false)
+    }
+
+    setDeferredPrompt(null)
+  }
 
   const handleLogout = () => {
     localStorage.removeItem("auth_token")
@@ -134,20 +172,32 @@ export function AppSidebar() {
   }
 
   return (
-    <Sidebar className="border-r border-green-100">
-      <SidebarContent className="bg-gradient-to-b from-green-50 via-amber-50 to-green-50">
+    <Sidebar className="border-r border-orange-100">
+      <SidebarContent className="bg-gradient-to-b from-orange-50 via-red-50 to-orange-50">
         <SidebarGroup>
-          <div className="px-4 py-6 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg mx-3 mt-3 mb-4 shadow-lg">
+          <div className="px-4 py-6 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-lg mx-3 mt-3 mb-4 shadow-lg">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
                 <Flame className="w-6 h-6 text-white" />
               </div>
               <div>
                 <SidebarGroupLabel className="text-white font-bold text-lg">Restaurant Admin</SidebarGroupLabel>
-                <p className="text-green-100 text-xs">Management Portal</p>
+                <p className="text-orange-100 text-xs">Management Portal</p>
               </div>
             </div>
           </div>
+
+          {showInstallButton && (
+            <div className="px-3 mb-4">
+              <Button
+                onClick={handleInstallApp}
+                className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-orange-600 to-orange-700 text-white hover:from-orange-700 hover:to-orange-800 py-2 rounded-lg transition-all duration-300 text-sm font-semibold shadow-md hover:shadow-lg"
+              >
+                <Download className="h-4 w-4" />
+                <span>Install App</span>
+              </Button>
+            </div>
+          )}
 
           <SidebarGroupContent className="px-2">
             <SidebarMenu className="space-y-1">
@@ -171,10 +221,10 @@ export function AppSidebar() {
                               <SidebarMenuSubButton
                                 asChild
                                 isActive={pathname === subItem.url}
-                                className="hover:bg-green-100 rounded-md transition-colors"
+                                className="hover:bg-orange-100 rounded-md transition-colors"
                               >
                                 <Link href={subItem.url} className="flex items-center gap-2">
-                                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                  <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
                                   {subItem.title}
                                 </Link>
                               </SidebarMenuSubButton>
@@ -189,14 +239,14 @@ export function AppSidebar() {
                       isActive={pathname === item.url}
                       className={`${item.bgColor} transition-all duration-200 rounded-lg mx-1 group hover:shadow-sm ${
                         pathname === item.url
-                          ? "bg-gradient-to-r from-green-100 to-amber-100 border-l-4 border-green-600"
+                          ? "bg-gradient-to-r from-orange-100 to-red-100 border-l-4 border-orange-600"
                           : ""
                       }`}
                     >
                       <Link href={item.url || "#"} className="flex items-center gap-3">
                         <item.icon className={`h-5 w-5 ${item.color} group-hover:scale-110 transition-transform`} />
                         <span className="font-medium">{item.title}</span>
-                        {pathname === item.url && <TrendingUp className="ml-auto h-4 w-4 text-green-600" />}
+                        {pathname === item.url && <TrendingUp className="ml-auto h-4 w-4 text-orange-600" />}
                       </Link>
                     </SidebarMenuButton>
                   )}
@@ -207,10 +257,10 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="p-3 bg-gradient-to-r from-green-50 to-amber-50 border-t border-green-200">
+      <SidebarFooter className="p-3 bg-gradient-to-r from-orange-50 to-red-50 border-t border-orange-200">
         <Button
           variant="ghost"
-          className="w-full justify-start hover:bg-gradient-to-r hover:from-green-100 hover:to-amber-100 transition-all duration-200 rounded-lg group"
+          className="w-full justify-start hover:bg-gradient-to-r hover:from-orange-100 hover:to-red-100 transition-all duration-300 rounded-lg group"
           onClick={handleLogout}
         >
           <LogOut className="h-4 w-4 mr-2 text-red-500 group-hover:scale-110 transition-transform" />

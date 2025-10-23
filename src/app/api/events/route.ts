@@ -1,5 +1,34 @@
 import { type NextRequest, NextResponse } from "next/server"
 
+async function verifyCaptcha(token: string): Promise<boolean> {
+  const secretKey = process.env.RECAPTCHA_SECRET_KEY
+
+  if (!secretKey) {
+    console.error("[v0] RECAPTCHA_SECRET_KEY is not set")
+    return false
+  }
+
+  try {
+    const response = await fetch("https://www.google.com/recaptcha/api/siteverify", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: `secret=${secretKey}&response=${token}`,
+    })
+
+    const data = await response.json()
+    if (!data.success) {
+      console.error("[v0] reCAPTCHA error codes:", data["error-codes"])
+    }
+
+    return data.success === true
+  } catch (error) {
+    console.error("[v0] CAPTCHA verification error:", error)
+    return false
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -12,7 +41,6 @@ export async function GET(request: NextRequest) {
 
     let apiEndpoint = `${apiUrl}/api/events`
 
-    // Build query parameters
     const params = new URLSearchParams()
     if (userId) params.append("user_id", userId)
     if (status) params.append("status", status)
@@ -55,22 +83,44 @@ export async function POST(request: NextRequest) {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
     const body = await request.json()
 
+    // Verify CAPTCHA
+    const { captchaToken, ...eventData } = body
+
+    if (!captchaToken) {
+      return NextResponse.json(
+        {
+          error: "CAPTCHA verification is required.",
+        },
+        { status: 400 }
+      )
+    }
+
+    const isCaptchaValid = await verifyCaptcha(captchaToken)
+    if (!isCaptchaValid) {
+      return NextResponse.json(
+        {
+          error: "CAPTCHA verification failed. Please try again.",
+        },
+        { status: 400 }
+      )
+    }
+
     // Validate required fields
-    if (!body.name || !body.email) {
+    if (!eventData.name || !eventData.email) {
       return NextResponse.json({ error: "Name and email are required" }, { status: 400 })
     }
 
     const authHeader = request.headers.get("authorization")
 
     const convertedBody = {
-      name: body.name,
-      email: body.email,
-      userId: body.userId || body.user_id || null,
-      eventType: body.eventType,
-      guests: body.guests,
-      preferredDate: body.preferredDate,
-      preferredTime: body.preferredTime,
-      venueArea: body.venueArea,
+      name: eventData.name,
+      email: eventData.email,
+      userId: eventData.userId || eventData.user_id || null,
+      eventType: eventData.eventType,
+      guests: eventData.guests,
+      preferredDate: eventData.preferredDate,
+      preferredTime: eventData.preferredTime,
+      venueArea: eventData.venueArea,
     }
 
     const headers: Record<string, string> = {

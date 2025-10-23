@@ -1,15 +1,68 @@
 import { type NextRequest, NextResponse } from "next/server"
 
+async function verifyCaptcha(token: string): Promise<boolean> {
+  const secretKey = process.env.RECAPTCHA_SECRET_KEY
+
+  if (!secretKey) {
+    console.error("[v0] RECAPTCHA_SECRET_KEY is not set")
+    return false
+  }
+
+  try {
+    const response = await fetch("https://www.google.com/recaptcha/api/siteverify", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: `secret=${secretKey}&response=${token}`,
+    })
+
+    const data = await response.json()
+    if (!data.success) {
+      console.error("[v0] reCAPTCHA error codes:", data["error-codes"])
+    }
+
+    return data.success === true
+  } catch (error) {
+    console.error("[v0] CAPTCHA verification error:", error)
+    return false
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
+    const { email, password, captchaToken } = body
 
-    console.log("=== LOGIN DEBUG START ===")
-    console.log("Request body received:", { email: body.email, password: "[HIDDEN]" })
+    if (!captchaToken) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "CAPTCHA verification is required. CAPTCHA 검증이 필요합니다.",
+          errors: {
+            captcha: ["CAPTCHA token is missing"],
+          },
+        },
+        { status: 400 },
+      )
+    }
+
+    const isCaptchaValid = await verifyCaptcha(captchaToken)
+    if (!isCaptchaValid) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "CAPTCHA verification failed. Please try again. CAPTCHA 검증에 실패했습니다.",
+          errors: {
+            captcha: ["CAPTCHA verification failed"],
+          },
+        },
+        { status: 400 },
+      )
+    }
 
     // Validate required fields
     if (!body.email || !body.password) {
-      console.log("Validation failed - missing required fields")
       return NextResponse.json(
         {
           success: false,
@@ -26,14 +79,10 @@ export async function POST(request: NextRequest) {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
     const fullUrl = `${apiUrl}/api/auth/login`
 
-    console.log("Attempting to connect to Laravel API at:", fullUrl)
-
     const requestData = {
       email: body.email.trim().toLowerCase(),
       password: body.password,
     }
-
-    console.log("Sending data to Laravel:", { email: requestData.email, password: "[HIDDEN]" })
 
     // Send to Laravel backend
     const response = await fetch(fullUrl, {
@@ -45,26 +94,20 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify(requestData),
     })
 
-    console.log("Laravel API response status:", response.status)
-    console.log("Laravel API response headers:", Object.fromEntries(response.headers.entries()))
-
     let data
     const responseText = await response.text()
-    console.log("Laravel API raw response:", responseText)
 
     try {
       data = JSON.parse(responseText)
-      console.log("Laravel API parsed response:", data)
     } catch (parseError) {
-      console.error("Failed to parse Laravel response as JSON:", parseError)
-      console.log("Response was not valid JSON, raw text:", responseText)
+      console.error("[v0] Failed to parse response as JSON:", parseError)
 
       return NextResponse.json(
         {
           success: false,
           message: "Invalid response from server. Server may be down or returning HTML error page.",
           error: "Invalid JSON response",
-          rawResponse: responseText.substring(0, 500), // First 500 chars for debugging
+          rawResponse: responseText.substring(0, 500),
           debug: {
             url: fullUrl,
             status: response.status,
@@ -75,8 +118,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log("=== LOGIN DEBUG END ===")
-
     // Return the response with the same status code
     return NextResponse.json(data, {
       status: response.status,
@@ -85,26 +126,16 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error: unknown) {
-    console.error("=== LOGIN ERROR ===")
-
-    if (error instanceof Error) {
-      console.error("Error type:", error.constructor.name)
-      console.error("Error message:", error.message)
-      console.error("Full error:", error)
-      console.error("Stack trace:", error.stack)
-    } else {
-      console.error("Non-Error thrown:", error)
-    }
+    console.error("[v0] Login error:", error instanceof Error ? error.message : String(error))
 
     // Check if it's a network error
     if (error instanceof TypeError && error.message.includes("fetch")) {
-      console.error("Network/Connection error detected")
       return NextResponse.json(
         {
           success: false,
           message:
-            "Cannot connect to the server. Please make sure your Laravel backend is running on http://localhost:8000. 서버에 연결할 수 없습니다.",
-          error: "Connection failed to Laravel backend",
+            "Cannot connect to the server. 서버에 연결할 수 없습니다.",
+          error: "Connection failed",
           debug: {
             errorType: "NetworkError",
             errorMessage: error instanceof Error ? error.message : String(error),
@@ -120,10 +151,6 @@ export async function POST(request: NextRequest) {
         success: false,
         message: "Login failed. Please try again later. 로그인에 실패했습니다. 나중에 다시 시도해 주세요.",
         error: error instanceof Error ? error.message : "Unknown error",
-        debug: {
-          errorType: error instanceof Error ? error.constructor.name : typeof error,
-          stack: error instanceof Error ? error.stack?.split("\n").slice(0, 5) : [],
-        },
       },
       { status: 500 },
     )

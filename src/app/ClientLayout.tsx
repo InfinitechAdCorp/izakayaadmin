@@ -20,7 +20,7 @@ export default function ClientLayout({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
-  const showHeader = pathname !== "/login" && pathname !== "/register"
+  const showHeader = pathname !== "/" && pathname !== "/login" && pathname !== "/register"
 
   return (
     <>

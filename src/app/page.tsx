@@ -1,25 +1,5 @@
-import { menuItems } from "@/data/menuData"
-import HeroSection from "@/components/sections/Hero"
-import FeaturedMenu from "@/components/sections/FeaturedMenu"
-import AboutPreview from "@/components/sections/HomePreview"
-import CTASection from "@/components/sections/CTASection"
-import TestimonialsSection from "@/components/testimonials-section"
-export default function Home() {
-  const featuredItems = menuItems.slice(0, 3)
+import Login from "@/components/auth/login"
 
-  return (
-    <div className="min-h-screen">
-      {/* Hero Section */}
-      <HeroSection />
-
-      {/* Featured Menu Section */}
-      <FeaturedMenu />
-
-      {/* About Preview Section */}
-      <AboutPreview />
-<TestimonialsSection/>
-      {/* CTA Section */}
-      <CTASection />
-    </div>
-  )
+export default function LoginPage() {
+  return <Login />
 }

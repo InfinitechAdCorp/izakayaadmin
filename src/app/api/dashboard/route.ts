@@ -19,17 +19,40 @@ async function fetchDashboardAnalytics() {
   return response.json()
 }
 
+async function fetchTotalReservations() {
+  const response = await fetch(`${LARAVEL_API_BASE}/api/reservations`, {
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+  })
+
+  if (!response.ok) {
+    console.error(`Laravel Reservations API error (${response.status})`)
+    return 0
+  }
+
+  const data = await response.json()
+  return data.data ? data.data.length : 0
+}
+
 export async function GET() {
   try {
     console.log("[v0] Fetching analytics from Laravel DashboardController...")
 
-    const analyticsResponse = await fetchDashboardAnalytics()
+    const [analyticsResponse, totalReservations] = await Promise.all([
+      fetchDashboardAnalytics(),
+      fetchTotalReservations(),
+    ])
 
     if (analyticsResponse.success) {
       console.log("[v0] Successfully fetched analytics data")
       return NextResponse.json({
         success: true,
-        data: analyticsResponse.data,
+        data: {
+          ...analyticsResponse.data,
+          totalReservations,
+        },
       })
     } else {
       throw new Error("Laravel API returned success: false")
@@ -55,6 +78,7 @@ export async function GET() {
           paymentMethodData: [],
           popularProducts: [],
           categoryData: [],
+          totalReservations: 0,
         },
       },
       { status: 500 },

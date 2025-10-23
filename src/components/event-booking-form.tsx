@@ -1,12 +1,22 @@
 "use client"
 
 import type React from "react"
-
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+
+declare global {
+  interface Window {
+    grecaptcha: {
+      render: (element: string, options: object) => number
+      getResponse: (widgetId?: number) => string
+      reset: (widgetId?: number) => void
+    }
+    onEventRecaptchaLoad?: () => void
+  }
+}
 
 interface FormData {
   name: string
@@ -45,6 +55,57 @@ export default function EventBookingForm({ onSuccess, user: initialUser }: Event
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState("")
   const [user, setUser] = useState<User | null>(initialUser || null)
+  const [captchaReady, setCaptchaReady] = useState(false)
+  const [captchaWidgetId, setCaptchaWidgetId] = useState<number | null>(null)
+  const isRenderingRef = useRef(false)
+
+  useEffect(() => {
+    const renderCaptcha = () => {
+      if (isRenderingRef.current) return
+      
+      const container = document.getElementById("event-recaptcha-container")
+      if (!container || !window.grecaptcha) return
+      
+      if (container.innerHTML.trim() !== "") {
+        console.log("[v0] reCAPTCHA already rendered, skipping")
+        setCaptchaReady(true)
+        return
+      }
+
+      isRenderingRef.current = true
+      
+      try {
+        const widgetId = window.grecaptcha.render("event-recaptcha-container", {
+          sitekey: "6LfqwPIrAAAAAPLhnsOuUTFwddCB0pzqcvy_4Nid",
+          theme: "light",
+        })
+        setCaptchaWidgetId(widgetId)
+        setCaptchaReady(true)
+        console.log("[v0] Event reCAPTCHA rendered successfully")
+      } catch (error) {
+        console.error("[v0] reCAPTCHA render error:", error)
+        isRenderingRef.current = false
+      }
+    }
+
+    window.onEventRecaptchaLoad = renderCaptcha
+
+    const existingScript = document.querySelector('script[src*="recaptcha"]')
+    
+    if (!existingScript) {
+      const script = document.createElement("script")
+      script.src = "https://www.google.com/recaptcha/api.js?onload=onEventRecaptchaLoad&render=explicit"
+      script.async = true
+      script.defer = true
+      document.head.appendChild(script)
+    } else if (window.grecaptcha) {
+      renderCaptcha()
+    }
+
+    return () => {
+      delete window.onEventRecaptchaLoad
+    }
+  }, [])
 
   useEffect(() => {
     if (initialUser) {
@@ -64,7 +125,6 @@ export default function EventBookingForm({ onSuccess, user: initialUser }: Event
     }
   }, [initialUser])
 
-  // Auto-fill name, email, and userId when user is logged in
   useEffect(() => {
     if (user) {
       console.log("[v0] User data received:", user)
@@ -87,8 +147,15 @@ export default function EventBookingForm({ onSuccess, user: initialUser }: Event
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
     setMessage("")
+
+    const captchaToken = window.grecaptcha?.getResponse(captchaWidgetId || undefined)
+    if (!captchaToken) {
+      setMessage("Please complete the CAPTCHA verification.")
+      return
+    }
+
+    setLoading(true)
 
     try {
       console.log("[v0] Form data before submit:", formData)
@@ -109,7 +176,10 @@ export default function EventBookingForm({ onSuccess, user: initialUser }: Event
       const response = await fetch("/api/events", {
         method: "POST",
         headers,
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          captchaToken,
+        }),
       })
 
       console.log("[v0] API response status:", response.status)
@@ -123,7 +193,6 @@ export default function EventBookingForm({ onSuccess, user: initialUser }: Event
       console.log("[v0] Event booked successfully:", data)
       setMessage("Event booked successfully!")
 
-      // Reset only event-specific fields, keep user info
       setFormData({
         name: user?.name || "",
         email: user?.email || "",
@@ -135,18 +204,20 @@ export default function EventBookingForm({ onSuccess, user: initialUser }: Event
         venueArea: "",
       })
 
+      window.grecaptcha?.reset(captchaWidgetId || undefined)
+
       setTimeout(() => {
         onSuccess?.()
       }, 1500)
     } catch (error) {
       setMessage("Error booking event. Please try again.")
       console.error("[v0] Error:", error)
+      window.grecaptcha?.reset(captchaWidgetId || undefined)
     } finally {
       setLoading(false)
     }
   }
 
-  // Check if user is logged in
   const isLoggedIn = !!user
 
   return (
@@ -165,7 +236,6 @@ export default function EventBookingForm({ onSuccess, user: initialUser }: Event
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Name */}
               <div className="space-y-2">
                 <Label htmlFor="name" className="text-black font-semibold text-sm">
                   Full Name
@@ -185,7 +255,6 @@ export default function EventBookingForm({ onSuccess, user: initialUser }: Event
                 />
               </div>
 
-              {/* Email */}
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-black font-semibold text-sm">
                   Email Address
@@ -211,7 +280,6 @@ export default function EventBookingForm({ onSuccess, user: initialUser }: Event
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Event Type */}
               <div className="space-y-2">
                 <Label htmlFor="eventType" className="text-black font-semibold text-sm">
                   Event Type
@@ -233,7 +301,6 @@ export default function EventBookingForm({ onSuccess, user: initialUser }: Event
                 </select>
               </div>
 
-              {/* Number of Guests */}
               <div className="space-y-2">
                 <Label htmlFor="guests" className="text-black font-semibold text-sm">
                   Number of Guests
@@ -256,7 +323,6 @@ export default function EventBookingForm({ onSuccess, user: initialUser }: Event
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Preferred Date */}
               <div className="space-y-2">
                 <Label htmlFor="preferredDate" className="text-black font-semibold text-sm">
                   Preferred Date
@@ -273,7 +339,6 @@ export default function EventBookingForm({ onSuccess, user: initialUser }: Event
                 />
               </div>
 
-              {/* Preferred Time */}
               <div className="space-y-2">
                 <Label htmlFor="preferredTime" className="text-black font-semibold text-sm">
                   Preferred Time
@@ -294,7 +359,6 @@ export default function EventBookingForm({ onSuccess, user: initialUser }: Event
               <h2 className="text-lg font-bold text-black">Venue</h2>
             </div>
 
-            {/* Venue Area */}
             <div className="space-y-2">
               <Label htmlFor="venueArea" className="text-black font-semibold text-sm">
                 Venue Area (Inside Restaurant)
@@ -311,11 +375,13 @@ export default function EventBookingForm({ onSuccess, user: initialUser }: Event
                 <option value="vip_area">VIP AREA</option>
                 <option value="main_hall">Main Hall</option>
                 <option value="private_room">Private Room</option>
-             
               </select>
             </div>
 
-            {/* Message Display */}
+            <div className="flex justify-center py-2">
+              <div id="event-recaptcha-container" />
+            </div>
+
             {message && (
               <div
                 className={`p-3 rounded-lg text-center font-bold text-sm border-2 ${
@@ -330,8 +396,8 @@ export default function EventBookingForm({ onSuccess, user: initialUser }: Event
 
             <Button
               type="submit"
-              disabled={loading}
-              className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded-lg border-2 border-orange-600 text-sm transition-all shadow-md hover:shadow-lg active:scale-95"
+              disabled={loading || !captchaReady}
+              className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded-lg border-2 border-orange-600 text-sm transition-all shadow-md hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? "Booking..." : "Book Event"}
             </Button>
